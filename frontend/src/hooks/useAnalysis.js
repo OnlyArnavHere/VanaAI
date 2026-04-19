@@ -106,6 +106,33 @@ function generateMockAnalysis(lat, lon) {
       suitability_reasons: ['fastest growing', 'high CO₂ capture', 'erosion control'],
       constraints: seed < 0.3 ? ['insufficient rainfall'] : [],
     },
+    {
+      species: 'Tectona grandis',
+      common_name: 'Teak',
+      survival_1yr: +(0.65 + seed * 0.2).toFixed(2),
+      survival_5yr: +(0.45 + seed * 0.2).toFixed(2),
+      co2_tonnes_per_year: 0.022,
+      suitability_reasons: ['valuable timber', 'termite resistant', 'deciduous'],
+      constraints: seed > 0.7 ? ['requires well-drained soil'] : [],
+    },
+    {
+      species: 'Mangifera indica',
+      common_name: 'Mango',
+      survival_1yr: +(0.60 + seed * 0.25).toFixed(2),
+      survival_5yr: +(0.40 + seed * 0.25).toFixed(2),
+      co2_tonnes_per_year: 0.028,
+      suitability_reasons: ['fruit bearing', 'shade providing', 'commercially valuable'],
+      constraints: [],
+    },
+    {
+      species: 'Terminalia arjuna',
+      common_name: 'Arjuna',
+      survival_1yr: +(0.70 + seed * 0.15).toFixed(2),
+      survival_5yr: +(0.52 + seed * 0.15).toFixed(2),
+      co2_tonnes_per_year: 0.022,
+      suitability_reasons: ['medicinal bark', 'soil conservation', 'native'],
+      constraints: [],
+    },
   ];
 
   // Create circular GeoJSON polygon

@@ -66,41 +66,55 @@ async def analyze_location(request: AnalyzeRequest):
 
     logger.info(f"Fitness score: {fitness_score}")
 
-    # ── Step 3: Predict species survival ──
-    species_predictions = survival_model.predict(
-        soil_ph=soil_data.get("ph", 6.5),
-        annual_rainfall_mm=climate_data.get("annual_rainfall_mm", 800),
-        max_temp_c=climate_data.get("max_temp_c", 35),
-        ndvi_score=ndvi_data.get("ndvi_mean", 0.35),
-        elevation_m=100,  # TODO: get from DEM API
-        land_use_type="open" if landuse_data.get("open_land") else "mixed",
-    )
-
-    # Take top 3 species
-    top_species = species_predictions[:3]
-
-    species_recommendations = [
-        SpeciesRecommendation(
-            species=sp["species"],
-            common_name=sp["common_name"],
-            survival_1yr=sp["survival_1yr"],
-            survival_5yr=sp["survival_5yr"],
-            co2_tonnes_per_year=sp["co2_tonnes_per_year"],
-            suitability_reasons=sp["suitability_reasons"],
-            constraints=sp["constraints"],
-        )
-        for sp in top_species
-    ]
-
-    # ── Step 4: Compute CO₂ potential ──
-    avg_co2 = sum(sp["co2_tonnes_per_year"] for sp in top_species) / max(len(top_species), 1)
-    co2_potential = CO2Potential(
-        per_100_trees_per_year=round(avg_co2 * 100, 2),
-        over_10_years=round(avg_co2 * 100 * 10, 2),
-    )
-
     # ── Step 5: Detect constraints ──
     constraints_detected = _detect_constraints(landuse_data, lat, lon)
+
+    # Detect if directly in a water body
+    in_water = any(w.get("distance_m", 999) < 20 for w in landuse_data.get("water_bodies", []))
+    if ndvi_data.get("ndvi_mean", 1) < -0.1:
+        in_water = True
+
+    if in_water:
+        fitness_score = 0.0
+        fitness_breakdown["land_use_score"] = 0.0
+        fitness_breakdown["constraints_score"] = 0.0
+        constraints_detected.append("location_in_water_body")
+        top_species = []
+        species_recommendations = []
+        co2_potential = CO2Potential(per_100_trees_per_year=0, over_10_years=0)
+    else:
+        # ── Step 3: Predict species survival ──
+        species_predictions = survival_model.predict(
+            soil_ph=soil_data.get("ph", 6.5),
+            annual_rainfall_mm=climate_data.get("annual_rainfall_mm", 800),
+            max_temp_c=climate_data.get("max_temp_c", 35),
+            ndvi_score=ndvi_data.get("ndvi_mean", 0.35),
+            elevation_m=100,  # TODO: get from DEM API
+            land_use_type="open" if landuse_data.get("open_land") else "mixed",
+        )
+
+        # Take top 6 species
+        top_species = species_predictions[:6]
+
+        species_recommendations = [
+            SpeciesRecommendation(
+                species=sp["species"],
+                common_name=sp["common_name"],
+                survival_1yr=sp["survival_1yr"],
+                survival_5yr=sp["survival_5yr"],
+                co2_tonnes_per_year=sp["co2_tonnes_per_year"],
+                suitability_reasons=sp["suitability_reasons"],
+                constraints=sp["constraints"],
+            )
+            for sp in top_species
+        ]
+
+        # ── Step 4: Compute CO₂ potential ──
+        avg_co2 = sum(sp["co2_tonnes_per_year"] for sp in top_species) / max(len(top_species), 1)
+        co2_potential = CO2Potential(
+            per_100_trees_per_year=round(avg_co2 * 100, 2),
+            over_10_years=round(avg_co2 * 100 * 10, 2),
+        )
 
     # ── Step 6: Generate planting zone GeoJSON ──
     planting_zones = _generate_planting_zones(lat, lon, radius, fitness_score, landuse_data)
@@ -148,17 +162,24 @@ async def analyze_location_stream(request: AnalyzeRequest):
     fitness_score = score_result["fitness_score"]
     fitness_breakdown = score_result["fitness_breakdown"]
 
-    species_predictions = survival_model.predict(
-        soil_ph=soil_data.get("ph", 6.5),
-        annual_rainfall_mm=climate_data.get("annual_rainfall_mm", 800),
-        max_temp_c=climate_data.get("max_temp_c", 35),
-        ndvi_score=ndvi_data.get("ndvi_mean", 0.35),
-    )
+    in_water = any(w.get("distance_m", 999) < 20 for w in landuse_data.get("water_bodies", []))
+    if ndvi_data.get("ndvi_mean", 1) < -0.1:
+        in_water = True
+
+    if in_water:
+        species_predictions = []
+    else:
+        species_predictions = survival_model.predict(
+            soil_ph=soil_data.get("ph", 6.5),
+            annual_rainfall_mm=climate_data.get("annual_rainfall_mm", 800),
+            max_temp_c=climate_data.get("max_temp_c", 35),
+            ndvi_score=ndvi_data.get("ndvi_mean", 0.35),
+        )
 
     async def event_generator():
         async for token in stream_rationale(
             lat, lon, soil_data, climate_data, ndvi_data, landuse_data,
-            fitness_score, fitness_breakdown, species_predictions[:3],
+            fitness_score, fitness_breakdown, species_predictions[:6],
         ):
             yield f"data: {token}\n\n"
         yield "data: [DONE]\n\n"

@@ -77,28 +77,26 @@ export function getScoreLabel(score) {
 }
 
 /**
- * OSM dark tile style for MapLibre (CartoDB dark matter).
+ * Esri World Imagery satellite style for MapLibre.
  */
 export const MAP_STYLE = {
   version: 8,
-  name: 'VanaAI Dark',
+  name: 'VanaAI Satellite',
   sources: {
-    'osm-tiles': {
+    'esri-satellite': {
       type: 'raster',
       tiles: [
-        'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png',
-        'https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png',
-        'https://c.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png',
+        'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
       ],
       tileSize: 256,
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
+      attribution: '&copy; <a href="https://www.esri.com/">Esri</a>',
     },
   },
   layers: [
     {
-      id: 'osm-tiles-layer',
+      id: 'satellite-layer',
       type: 'raster',
-      source: 'osm-tiles',
+      source: 'esri-satellite',
       minzoom: 0,
       maxzoom: 19,
     },
