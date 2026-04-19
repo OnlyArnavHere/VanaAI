@@ -1,0 +1,41 @@
+version: "3.9"
+
+services:
+  # ──────────────── PostgreSQL + PostGIS ────────────────
+  db:
+    image: postgis/postgis:15-3.4
+    container_name: vanai-db
+    environment:
+      POSTGRES_DB: vanai_db
+      POSTGRES_USER: vanai
+      POSTGRES_PASSWORD: vanai_secret
+    ports:
+      - "5432:5432"
+    volumes:
+      - vanai_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vanai -d vanai_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ──────────────── FastAPI Backend ────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: vanai-backend
+    environment:
+      DATABASE_URL: postgresql://vanai:vanai_secret@db:5432/vanai_db
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+volumes:
+  vanai_pgdata:
